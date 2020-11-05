@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!--<property>    &lt;!&ndash;设置的是hdfs的文件目录&ndash;&gt;-->
+        <!--<name>hbase.rootdir</name>-->
+        <!--<value>hdfs://master:8020/hbase</value>-->
+    <!--</property>-->
+    <!--<property>    &lt;!&ndash;集群模式，分布式true,单机模式false&ndash;&gt;-->
+
+        <!--<name>hbase.cluster.distributed</name>-->
+        <!--<value>true</value>-->
+    <!--</property>-->
+    <!--<property>     &lt;!&ndash;  指定zookeeper &ndash;&gt;-->
+        <!--<name>hbase.zookeeper.property.dataDir</name>-->
+        <!--<value>/soft/hbase-1.4.9/zookeeper</value>-->
+    <!--</property>-->
+    <!--<property>    &lt;!&ndash;zookeeper集群的URL配置&ndash;&gt;-->
+        <!--<name>hbase.zookeeper.quorum</name>-->
+        <!--<value>	cdh2.360kad.com	:2181,cdh4.360kad.com:2181,cdh5.360kad.com:2181</value>-->
+    <!--</property>-->
+    <!--<property> &lt;!&ndash;  定义master的ip和端口  &ndash;&gt;-->
+        <!--<name>hbase.master</name>-->
+        <!--<value>master:60000</value>-->
+    <!--</property>-->
+    <!--<property>    &lt;!&ndash;hbase 结点之间时间不一致造成regionserver启动失败 ，增大容忍度&ndash;&gt;-->
+        <!--<name>hbase.master.maxclockskew</name>-->
+        <!--<value>100000000</value>-->
+    <!--</property>-->
+
+    <property>
+        <name>phoenix.schema.isNamespaceMappingEnabled</name>
+        <value>true</value>
+        <description>命名空间开启</description>
+    </property>
+
+    <property>
+        <name>hbase.regionserver.wal.codec</name>
+        <value>org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec</value>
+        <description>二级索引支持</description>
+    </property>
+</configuration>
