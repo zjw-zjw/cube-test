@@ -328,7 +328,7 @@
     <orderEntry type="library" name="Maven: mysql:mysql-connector-java:5.1.44" level="project" />
     <orderEntry type="library" name="Maven: org.apache.flink:flink-clients_2.11:1.11.0" level="project" />
     <orderEntry type="library" name="Maven: org.apache.flink:flink-optimizer_2.11:1.11.0" level="project" />
-    <orderEntry type="library" name="Maven: com.alibaba:fastjson:1.1.46.sec01" level="project" />
+    <orderEntry type="library" name="Maven: com.alibaba:fastjson:1.2.41" level="project" />
     <orderEntry type="library" name="Maven: org.slf4j:slf4j-api:1.7.25" level="project" />
     <orderEntry type="library" name="Maven: org.slf4j:slf4j-simple:1.7.25" level="project" />
   </component>

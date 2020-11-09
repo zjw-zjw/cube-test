@@ -3,7 +3,9 @@ package com.kad.cube_test.hive;
 import com.alibaba.fastjson.JSONObject;
 import com.kad.cube_test.model.OmOrder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.calcite.shaded.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.flink.calcite.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.types.Row;
@@ -11,13 +13,13 @@ import org.apache.flink.types.Row;
 import java.sql.*;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
-public class OmOrderSourceFunction<T> extends RichSourceFunction<Row> {
-    Connection con = null;// 创建一个数据库连接
-    PreparedStatement pre = null;// 创建预编译语句对象，一般都是用这个而不用Statement
-    ResultSet result = null;// 创建一个结果集对象
-    String[] oracleDataTypeList = new String[] {"VARCHAR2", "NUMBER", "NVARCHAR2", "DATE"};
+public class OmOrderSourceFunction<T> extends RichSourceFunction<OmOrder> {
+    Connection con = null;          // 创建一个数据库连接
+    PreparedStatement pre = null;   // 创建预编译语句对象，一般都是用这个而不用Statement
+    ResultSet result = null;        // 创建一个结果集对象
 
     @Override
     public void open(Configuration parameters) throws Exception {
@@ -31,7 +33,7 @@ public class OmOrderSourceFunction<T> extends RichSourceFunction<Row> {
             String password = "dc360kad";
             con = DriverManager.getConnection(url, user, password);
             System.out.println("连接成功！");
-            String sql = "select * from om.OM_ORDER WHERE rownum <= 100";
+            String sql = "select * from om.OM_ORDER WHERE rownum <= 5";
             pre = con.prepareStatement(sql);
         } catch (Exception e){
             e.printStackTrace();
@@ -39,32 +41,52 @@ public class OmOrderSourceFunction<T> extends RichSourceFunction<Row> {
     }
 
     @Override
-    public void run(SourceContext<Row> ctx) throws Exception {
+    public void run(SourceContext<OmOrder> ctx) throws Exception {
         result = pre.executeQuery();
         ResultSetMetaData metaData = result.getMetaData();
         int columnCount = metaData.getColumnCount();
-        Map<String, String> columnType = new HashMap<>();
-
-        for (int i = 0; i < columnCount; i++) {
-            String columnTypeName = metaData.getColumnTypeName(i+1);
-//            Arrays.asList(oracleDataTypeList)
-            String columnName = metaData.getColumnName(i+1).toLowerCase();
-            columnType.put(columnName, columnTypeName);
-        }
-        System.out.println("type:" + columnType.toString());
+        String[] filedNames = new String[columnCount];
+//        Map<String, String> columnNameTypeMap = new HashMap<>();
+//        for (int i = 0; i < columnCount; i++) {
+//            String columnOriginTypeName = metaData.getColumnTypeName(i+1);
+//            String columnTypeName = "String";
+//            switch (columnOriginTypeName){
+//                case "VARCHAR2":
+//                    columnTypeName = "STRING";
+//                    break;
+//                case "NVARCHAR2":
+//                    columnTypeName = "STRING";
+//                    break;
+//                case "NUMBER":
+//                    columnTypeName = "DECIMAL";
+//                    break;
+//                case "DATE":
+//                    columnTypeName = "TIMESTAMP";
+//                    break;
+//            }
+//            String columnName = metaData.getColumnName(i+1).toLowerCase();
+//            columnNameTypeMap.put(columnName, columnTypeName);
+//        }
+//        System.out.println("type:" + columnNameTypeMap.toString());
 
         while (result.next()) {
             Map<String, Object> map = new HashMap<>();
             for (int i = 0; i < columnCount; i++) {
-                String col_name = metaData.getColumnName(i+1).toLowerCase();
+                String col_name  = metaData.getColumnName(i + 1).toLowerCase();
                 Object col_value = result.getObject(col_name);
                 map.put(col_name, col_value);
+                filedNames[i] = col_name;
             }
 
-//            System.out.println(map.toString());
+            // TODO
+            TypeInformation[] info = new TypeInformation[] {
+                    Types.STRING,
+                    Types.INT
+            };
+//            TypeInformation<Row> rowTypeInformation = Types.ROW_NAMED(filedNames, info);
+
             OmOrder omOrder = JSONObject.parseObject(JSONObject.toJSONString(map), OmOrder.class);
-            Row of = Row.of(omOrder);
-            ctx.collect(of);
+            ctx.collect(omOrder);
         }
     }
 

@@ -1,18 +1,16 @@
 package com.kad.cube_test.hive;
 
 import com.kad.cube_test.model.OmOrder;
-import org.apache.flink.connector.jdbc.table.JdbcTableSource;
-import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
+import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
-import org.apache.flink.types.Row;
 
 public class ReadOracleSinkToHive {
     static StreamExecutionEnvironment streamEnv;
@@ -21,9 +19,19 @@ public class ReadOracleSinkToHive {
         initTableEnvironment();
         initHiveCatalog(tableEnv);
 
-        DataStream<Row> dataStream = readOracleSource(streamEnv);
-//        tableEnv.createTemporaryView("aaa", dataStream);
+        DataStream<OmOrder> dataStream = readOracleSource(streamEnv);
         dataStream.print("order");
+
+        Table table = tableEnv.fromDataStream(dataStream);
+        table.printSchema();
+        tableEnv.createTemporaryView("om_order", table);
+//        tableEnv.toAppendStream(tableEnv.sqlQuery("select * from om_order"),Row.class).print("om_order");
+
+//        TableSchema schema = table.getSchema();
+//        DataType dataType = schema.toPhysicalRowDataType();
+//        LogicalType logicalType = dataType.getLogicalType();
+//        System.out.println("Physical Type: " + dataType.toString());
+//        System.out.println("Logical Type: " + logicalType.toString());
 
         TableSchema schema = tableEnv.getCatalog("myhive").get().getTable(new ObjectPath("test", "ods_om_om_order_test")).getSchema();
         System.out.println("hive - ods_om_om_order_test: \n" + schema.toString());
@@ -36,17 +44,13 @@ public class ReadOracleSinkToHive {
     private static void sinkToHive(StreamTableEnvironment tableEnv) throws TableNotExistException {
         String[] fieldNames = tableEnv.getCatalog("myhive").get().getTable(new ObjectPath("test", "ods_om_om_order_test")).getSchema().getFieldNames();
         String fileds = String.join(",", fieldNames);
-        String sql = "insert into `myhive`.test.ods_om_om_order_test select "+ fileds +" from om_order";
+        String sql = "insert into `myhive`.test.ods_om_om_order_test select " + fileds + " from om_order";
         tableEnv.executeSql(sql);
     }
 
-    private static void sinkCsvFile(StreamExecutionEnvironment streamEnv, DataStream<OmOrder> dataStream) {
 
-    }
-
-
-    private static DataStream<Row> readOracleSource(StreamExecutionEnvironment streamEnv) {
-        DataStreamSource<Row> source = streamEnv.addSource(new OmOrderSourceFunction<Row>());
+    private static DataStream<OmOrder> readOracleSource(StreamExecutionEnvironment streamEnv) {
+        DataStreamSource<OmOrder> source = streamEnv.addSource(new OmOrderSourceFunction<OmOrder>());
         return source;
     }
 
