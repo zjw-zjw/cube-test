@@ -40,13 +40,13 @@ public class HiveSourceTest {
         TableSchema schema = tableEnv.getCatalog("myhive").get().getTable(new ObjectPath("test", "test_order_base")).getSchema();
         System.out.println("test_order_base: " + schema);
 
-//        tableEnv.toAppendStream(tableEnv.sqlQuery("select * from `myhive`.`test`.stu"), Row.class).print("stu");
-//        streamEnv.execute("hive print job");
+        tableEnv.toAppendStream(tableEnv.sqlQuery("select * from `myhive`.`test`.stu"), Row.class).print("stu");
+        streamEnv.execute("hive print job");
 
-        StatementSet statementSet = tableEnv.createStatementSet();
-        statementSet.addInsertSql("insert into hive_print_sink select * from `myhive`.`test`.stu");
-        statementSet.addInsertSql("insert into fs_table select * from `myhive`.`test`.stu");
-        statementSet.execute();
+//        StatementSet statementSet = tableEnv.createStatementSet();
+//        statementSet.addInsertSql("insert into hive_print_sink select * from `myhive`.`test`.stu");
+//        statementSet.addInsertSql("insert into fs_table select * from `myhive`.`test`.stu");
+//        statementSet.execute();
     }
 
     private static void initSinkLocalFileSystem(StreamTableEnvironment tableEnv) {

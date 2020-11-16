@@ -11,8 +11,14 @@ public class OracleSourceTest {
     static StreamTableEnvironment tableEnv;
     public static void main(String[] args) {
         initTableEnvironment();
+        initOracleTable(tableEnv);
 
         tableEnv.sqlQuery("select * from wi_color").printSchema();
+    }
+
+    private static void initOracleTable(StreamTableEnvironment tableEnv) {
+        String DDL = "CREATE TABLE ods_om_order ";
+
     }
 
     private static void initTableEnvironment() {

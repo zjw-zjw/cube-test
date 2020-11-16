@@ -8,9 +8,15 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
+import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.LogicalType;
+
+import javax.xml.crypto.Data;
+import java.util.Map;
 
 public class ReadOracleSinkToHive {
     static StreamExecutionEnvironment streamEnv;
@@ -19,26 +25,29 @@ public class ReadOracleSinkToHive {
         initTableEnvironment();
         initHiveCatalog(tableEnv);
 
+
         DataStream<OmOrder> dataStream = readOracleSource(streamEnv);
         dataStream.print("order");
+        tableEnv.createTemporaryView("order", dataStream);
+//        typeSchemaInfoTest(tableEnv, dataStream);
 
-        Table table = tableEnv.fromDataStream(dataStream);
-        table.printSchema();
-        tableEnv.createTemporaryView("om_order", table);
-//        tableEnv.toAppendStream(tableEnv.sqlQuery("select * from om_order"),Row.class).print("om_order");
+//        Table table = tableEnv.fromDataStream(dataStream);
+//        tableEnv.createTemporaryView("om_order", table);
 
-//        TableSchema schema = table.getSchema();
-//        DataType dataType = schema.toPhysicalRowDataType();
-//        LogicalType logicalType = dataType.getLogicalType();
-//        System.out.println("Physical Type: " + dataType.toString());
-//        System.out.println("Logical Type: " + logicalType.toString());
-
-        TableSchema schema = tableEnv.getCatalog("myhive").get().getTable(new ObjectPath("test", "ods_om_om_order_test")).getSchema();
-        System.out.println("hive - ods_om_om_order_test: \n" + schema.toString());
+//        TableSchema schema = tableEnv.getCatalog("myhive").get().getTable(new ObjectPath("test", "ods_om_om_order_test")).getSchema();
+//        System.out.println("hive - ods_om_om_order_test: \n" + schema.toString());
 
 //        sinkToHive(tableEnv);
 
         streamEnv.execute("test oracle source job");
+    }
+
+    private static void typeSchemaInfoTest(StreamTableEnvironment tableEnv, DataStream<OmOrder> dataStram) throws TableNotExistException {
+        CatalogBaseTable table = tableEnv.getCatalog("myhive").get().getTable(new ObjectPath("test", "ods_om_om_order_test"));
+        TableSchema schema = table.getSchema();
+        DataType produceDataType = schema.toPhysicalRowDataType();
+        System.out.println(produceDataType.toString());
+
     }
 
     private static void sinkToHive(StreamTableEnvironment tableEnv) throws TableNotExistException {

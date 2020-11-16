@@ -4,9 +4,11 @@ import com.alibaba.fastjson.JSONObject;
 import com.kad.cube_test.model.OmOrder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.calcite.shaded.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.calcite.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.connector.jdbc.internal.converter.JdbcRowConverter;
 import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.types.Row;
 
@@ -79,11 +81,12 @@ public class OmOrderSourceFunction<T> extends RichSourceFunction<OmOrder> {
             }
 
             // TODO
-            TypeInformation[] info = new TypeInformation[] {
-                    Types.STRING,
-                    Types.INT
-            };
-//            TypeInformation<Row> rowTypeInformation = Types.ROW_NAMED(filedNames, info);
+//            TypeInformation<?>[] typeInformations = {
+//                    Types.STRING,
+//                    Types.INT
+//            };
+//            TypeInformation<?> rowTypeInfo = new RowTypeInfo(typeInformations, filedNames);
+
 
             OmOrder omOrder = JSONObject.parseObject(JSONObject.toJSONString(map), OmOrder.class);
             ctx.collect(omOrder);
