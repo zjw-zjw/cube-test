@@ -13,9 +13,10 @@
         <flink.version>1.11.0</flink.version>
         <java.version>1.8</java.version>
         <hive.version>2.1.1</hive.version>
-        <hadoop.version>2.8.4</hadoop.version>
+        <hadoop.version>3.0.3</hadoop.version>
         <scala.binary.version>2.11</scala.binary.version>
-        <kudu.version>1.9.0</kudu.version>
+        <kudu.version>1.11.1</kudu.version>
+        <log4j.version>2.12.1</log4j.version>
 
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
@@ -28,6 +29,7 @@
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-streaming-scala_${scala.binary.version}</artifactId>
             <version>${flink.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -68,6 +70,7 @@
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-kafka_${scala.binary.version}</artifactId>
             <version>${flink.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -208,6 +211,14 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/org.apache.hive/hive-metastore -->
+        <dependency>
+            <groupId>org.apache.hive</groupId>
+            <artifactId>hive-metastore</artifactId>
+            <version>${hive.version}</version>
+        </dependency>
+
+
         <!--data format json-->
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -218,6 +229,12 @@
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-csv</artifactId>
+            <version>${flink.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-parquet_${scala.binary.version}</artifactId>
             <version>${flink.version}</version>
         </dependency>
 
@@ -239,12 +256,14 @@
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-jdbc_${scala.binary.version}</artifactId>
             <version>1.10.2</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>com.kad</groupId>
             <artifactId>flink-connector-jdbc_${scala.binary.version}</artifactId>
-            <version>${flink.version}-SNAPSHOT</version>
+            <version>1.11.0-SNAPSHOT</version>
+<!--            <scope>provided</scope>-->
         </dependency>
 
 
@@ -276,6 +295,7 @@
                     <artifactId>slf4j-api</artifactId>
                 </exclusion>
             </exclusions>
+            <scope>provided</scope>
         </dependency>
 
 
@@ -284,6 +304,7 @@
             <groupId>org.apache.phoenix</groupId>
             <artifactId>phoenix-core</artifactId>
             <version>5.0.0-HBase-2.0</version>
+            <scope>provided</scope>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
@@ -326,13 +347,14 @@
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>
             <version>${hadoop.version}</version>
-            <!--<scope>provided</scope>-->
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-mapreduce-client-core</artifactId>
             <version>${hadoop.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -347,6 +369,7 @@
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-client</artifactId>
             <version>2.0.0</version>
+            <scope>provided</scope>
         </dependency>
 
         <!--不加这个 hbase-server 2.0.0 会报错-->
@@ -355,6 +378,7 @@
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-server</artifactId>
             <version>2.0.0</version>
+            <scope>provided</scope>
         </dependency>
 
 
@@ -362,7 +386,8 @@
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <version>5.1.44</version>
+            <version>8.0.20</version>
+            <scope>provided</scope>
         </dependency>
 
         <!--提交作业所必须的依赖，比如：LocalExecutorFactory -->
@@ -379,17 +404,24 @@
             <version>1.2.41</version>
         </dependency>
 
-        <!--加入下面两个依赖才会出现 Flink 的日志出来-->
+
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>1.7.25</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <version>${log4j.version}</version>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>1.7.25</version>
-            <scope>compile</scope>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>
@@ -405,26 +437,109 @@
         </dependency>
     </dependencies>
 
-    <!-- This profile helps to make things run out of the box in IntelliJ -->
-    <!-- Its adds Flink's core classes to the runtime class path. -->
-    <!-- Otherwise they are missing in IntelliJ, because the dependency is 'provided' -->
-    <profiles>
-        <profile>
-            <id>add-dependencies-for-IDEA</id>
-            <activation>
-                <property>
-                    <name>idea.version</name>
-                </property>
-            </activation>
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
 
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-streaming-java_${scala.binary.version}</artifactId>
-                    <version>${flink.version}</version>
-                    <scope>compile</scope>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
+            <!-- Java Compiler -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.1</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                </configuration>
+            </plugin>
+            <!-- We use the maven-shade plugin to create a fat jar that contains all necessary dependencies. -->
+            <!-- Change the value of <mainClass>...</mainClass> if your program entry point changes. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <!-- Run shade goal on package phase -->
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <artifactSet>
+                                <excludes>
+                                    <exclude>org.apache.flink:force-shading</exclude>
+                                    <exclude>com.google.code.findbugs:jsr305</exclude>
+                                    <exclude>org.slf4j:*</exclude>
+                                    <exclude>org.apache.logging.log4j:*</exclude>
+                                </excludes>
+                            </artifactSet>
+                            <filters>
+                                <filter>
+                                    <!-- Do not copy the signatures in the META-INF folder.
+                                    Otherwise, this might cause SecurityExceptions when using the JAR. -->
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.kad.cube_test.hive.PhoenixToHivePartitionTable</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+
+        <pluginManagement>
+            <plugins>
+
+                <!-- This improves the out-of-the-box experience in Eclipse by resolving some warnings. -->
+                <plugin>
+                    <groupId>org.eclipse.m2e</groupId>
+                    <artifactId>lifecycle-mapping</artifactId>
+                    <version>1.0.0</version>
+                    <configuration>
+                        <lifecycleMappingMetadata>
+                            <pluginExecutions>
+                                <pluginExecution>
+                                    <pluginExecutionFilter>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-shade-plugin</artifactId>
+                                        <versionRange>[3.0.0,)</versionRange>
+                                        <goals>
+                                            <goal>shade</goal>
+                                        </goals>
+                                    </pluginExecutionFilter>
+                                    <action>
+                                        <ignore />
+                                    </action>
+                                </pluginExecution>
+                                <pluginExecution>
+                                    <pluginExecutionFilter>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <versionRange>[3.1,)</versionRange>
+                                        <goals>
+                                            <goal>testCompile</goal>
+                                            <goal>compile</goal>
+                                        </goals>
+                                    </pluginExecutionFilter>
+                                    <action>
+                                        <ignore />
+                                    </action>
+                                </pluginExecution>
+                            </pluginExecutions>
+                        </lifecycleMappingMetadata>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

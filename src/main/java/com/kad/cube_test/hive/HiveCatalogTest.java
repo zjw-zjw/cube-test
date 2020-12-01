@@ -41,16 +41,30 @@ public class HiveCatalogTest {
         String sql = "select *, LOCALTIMESTAMP as data_modified_datetime from `myhive`.`test_hive`.ods_om_om_order_test limit 5001";
         tableEnv.executeSql("CREATE TEMPORARY VIEW om_order_hive AS " + sql);
 
-        String[] castFieldsArray = convertCastFieldsToPhoenix(tableEnv);
-        String castFields = String.join(",", castFieldsArray);
-
-        StatementSet statementSet = tableEnv.createStatementSet();
-        String insertPhoenixSql = "UPSERT INTO `phoenix`.`test`.`ods_om_om_order_test` select "+ castFields +" from om_order_hive";
-        statementSet.addInsertSql(insertPhoenixSql);
-        statementSet.execute();
-
-        tableEnv.toAppendStream(tableEnv.sqlQuery("select " + castFields + " from om_order_hive"), Row.class).print("hive_print");
+        // hive 与 Phoenix表join
+        String hiveJoinPhxSql = "select\n" +
+                "    b.ordercode,\n" +
+                "    a.ordercode,\n" +
+                "    a.address,\n" +
+                "    a.ordertime\n" +
+                "from\n" +
+                "    `phoenix`.`cube_phx`.`ods_om_om_orderaddress` a\n" +
+                "left join\n" +
+                "     om_order_hive b\n" +
+                "on\n" +
+                "    a.ordercode = b.ordercode";
+        tableEnv.toRetractStream(tableEnv.sqlQuery(hiveJoinPhxSql), Row.class).print();
         streamEnv.execute();
+
+//        String[] castFieldsArray = convertCastFieldsToPhoenix(tableEnv);
+//        String castFields = String.join(",", castFieldsArray);
+//        StatementSet statementSet = tableEnv.createStatementSet();
+//        String insertPhoenixSql = "UPSERT INTO `phoenix`.`test`.`ods_om_om_order_test` select "+ castFields +" from om_order_hive";
+//        statementSet.addInsertSql(insertPhoenixSql);
+//        statementSet.execute();
+
+//        tableEnv.toAppendStream(tableEnv.sqlQuery("select " + castFields + " from om_order_hive"), Row.class).print("hive_print");
+//        streamEnv.execute();
     }
 
     private static String[] convertCastFieldsToPhoenix(StreamTableEnvironment tableEnv) throws TableNotExistException {

@@ -3,6 +3,7 @@ package com.kad.cube_test.kudu;
 import com.ctrip.framework.apollo.ConfigFile;
 import com.ctrip.framework.apollo.ConfigService;
 import com.ctrip.framework.apollo.core.enums.ConfigFileFormat;
+import com.kad.cube_test.hive.KafkaSinkToHiveTest;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.connector.jdbc.catalog.JdbcCatalog;
 import org.apache.flink.connectors.kudu.table.KuduCatalog;
@@ -16,15 +17,18 @@ import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class PhoenixToKudu {
     private static ParameterTool config;
-
+    private static final Logger LOG = LoggerFactory.getLogger(PhoenixToKudu.class);
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment streamEnv = StreamExecutionEnvironment.getExecutionEnvironment();
         streamEnv.setParallelism(1);
@@ -38,20 +42,11 @@ public class PhoenixToKudu {
 
         String sql = "create temporary view phx_table as select * from `phoenix`.`test`.`date_test` ";
         tableEnv.executeSql(sql);
-        Table sqlQuery = tableEnv.sqlQuery("select * from phx_table");
-        tableEnv.toAppendStream(sqlQuery, Row.class).print();
-
-        List<String> strings = tableEnv.getCatalog("kudu").get().listTables("default_database");
-        System.out.println(strings.toString());
-
-//        CatalogBaseTable table = tableEnv.getCatalog("kudu").get().getTable(new ObjectPath("default_database", "impala::test.date_test2"));
-//        TableSchema schema = table.getSchema();
-//        System.out.println(schema);
-
-        streamEnv.execute();
-
         PhoenixSinkToKudu(tableEnv);
 
+        Table sqlQuery = tableEnv.sqlQuery("select * from phx_table");
+        tableEnv.toAppendStream(sqlQuery, Row.class).print();
+        streamEnv.execute();
     }
 
     private static void PhoenixSinkToKudu(StreamTableEnvironment tableEnv) throws Exception {
@@ -59,10 +54,8 @@ public class PhoenixToKudu {
         String convertFieldNames = String.join(",", convertFields);
         System.out.println(Arrays.toString(convertFields));
 
-
-
         String insertKuduSql = "UPSERT INTO `kudu`.`default_database`.`impala::test.date_test2` SELECT "
-                +convertFieldNames
+                + convertFieldNames
                 + " FROM phx_table";
 
         StatementSet statementSet = tableEnv.createStatementSet();
@@ -99,38 +92,32 @@ public class PhoenixToKudu {
     }
 
     private static String[] ConvertFields(StreamTableEnvironment tableEnv, String catalogName, String databaseName, String tableName) throws Exception {
-
-//
-        CatalogBaseTable table = tableEnv.getCatalog("kudu").get().getTable(new ObjectPath("default_database", "impala::test.date_test2"));
+        CatalogBaseTable table = tableEnv.getCatalog(catalogName).get().getTable(new ObjectPath("default_database", "impala::" + databaseName + "."+ tableName));
         TableSchema schema = table.getSchema();
-
         //获取表字段
-        String[] fields = schema.getFieldNames();
+        String[] fieldNames = schema.getFieldNames();
         //获取字段类型
         DataType[] fieldDataTypes = schema.getFieldDataTypes();
-        //获取字段数量
-        int fieldsCount = schema.getFieldNames().length;
 
-        String[] convertField = new String[fieldsCount];
-        //类型转换
-        for (int i = 0; i < fieldsCount; i++) {
-            for (DataType fieldDataType : fieldDataTypes) {
-                if (schema.getFieldDataType(fields[i]).get().toString().equals(fieldDataType.toString())) {
-                    if (fieldDataType.toString().contains("NOT NULL")) {
-                        String field = fieldDataType.toString().split(" ")[0];
-                        String type = "CAST(" + fields[i] + " AS " + field + " )";
-                        convertField[i] = type;
-                    } else {
-                        String field = fieldDataType.toString();
-                        String type = "CAST(" + fields[i] + " AS " + field + " )";
-                        convertField[i] = type;
+        ArrayList<String> castFieldList = new ArrayList<>();
+        for (String fieldName : fieldNames) {
+            if ( !fieldName.equals("p_day") ) {
+                for (DataType fieldDataType : fieldDataTypes) {
+                    if(schema.getFieldDataType(fieldName).get().toString().equals(fieldDataType.toString())) {
+                        String typeStr = fieldDataType.toString();
+                        if (typeStr.contains("NOT NULL")){
+                            String type = typeStr.split(" ")[0];
+                            String castFieldStr = "CAST(" + fieldName + " AS " + type + ") AS " + fieldName;
+                            castFieldList.add(castFieldStr);
+                        } else {
+                            String castFieldStr = "CAST(" + fieldName + " AS " + typeStr + ") AS " + fieldName;
+                            castFieldList.add(castFieldStr);
+                        }
+                        break;
                     }
-                    break;
                 }
             }
         }
-        return convertField;
+        return castFieldList.toArray(new String[castFieldList.size()]);
     }
-
-
 }
