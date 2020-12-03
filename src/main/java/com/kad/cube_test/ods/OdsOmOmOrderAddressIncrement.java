@@ -1,4 +1,4 @@
-package com.kad.cube_test.hive;
+package com.kad.cube_test.ods;
 
 import com.ctrip.framework.apollo.ConfigFile;
 import com.ctrip.framework.apollo.ConfigService;
@@ -6,32 +6,26 @@ import com.ctrip.framework.apollo.core.enums.ConfigFileFormat;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.connector.jdbc.catalog.JdbcCatalog;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.*;
-import org.apache.flink.table.api.bridge.java.BatchTableEnvironment;
-import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.types.DataType;
-import org.apache.flink.types.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 /**
- *  读取Phoenix数据 插入到 Hive分区表中
- *  idea中需要在 VM option配置中添加 ： -Djava.library.path=$HADOOP_HOME/lib/native
+ * 同步 Phoenix的零售订单收货地址表的新增变化数据 到 Hive的零售订单收货地址新增变化分区表
  */
-public class PhoenixToHivePartitionTable {
+public class OdsOmOmOrderAddressIncrement {
     private static ParameterTool config;
-    private static Logger log = LoggerFactory.getLogger(PhoenixToHivePartitionTable.class);
-    public static void main(String[] args) throws Exception {
+    private static Logger log = LoggerFactory.getLogger(OdsOmOmOrderAddressIncrement.class);
+    public static void main(String[] args) throws IOException, TableNotExistException {
         // 创建批处理环境
         ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
@@ -45,11 +39,11 @@ public class PhoenixToHivePartitionTable {
         initHiveCatalog(tableEnv);      // 初始化 Hive Catalog
         initPhoenixCatalog(tableEnv);   // 初始化 Phoenix Catalog
 
-        String hiveDatabase     = args[0];
-        String hiveTable        = args[1];
-        String phoenixDatabase  = args[2];
-        String phoenixTable     = args[3];
-        String partition_time   = args[4];
+        String hiveDatabase     = "myhive";
+        String hiveTable        = "ods_om_om_orderaddress_incr";
+        String phoenixDatabase  = "cube_phx";
+        String phoenixTable     = "ods_om_om_orderaddress";
+        String partition_time   = args[0];
 
         String hiveCatalog = "hive";
         String phoenixCatalog = "phoenix";
@@ -62,7 +56,7 @@ public class PhoenixToHivePartitionTable {
         String insertHiveSql_format = "INSERT OVERWRITE %s.%s.%s PARTITION(p_day='%s') select "
                 + castFieldsStr
                 + " FROM %s.%s.%s " +
-                " WHERE date_format(data_op_ts, 'yyyy-MM-dd') = '%s' or date_format(createdate, 'yyyy-MM-dd') = '%s'";
+                " WHERE (date_format(data_op_ts, 'yyyy-MM-dd') = '%s' or date_format(ordertime, 'yyyy-MM-dd') = '%s') ";
         String insertHiveSql = String.format(insertHiveSql_format,
                 hiveCatalog, hiveDatabase, hiveTable,
                 partition_time,
@@ -106,8 +100,8 @@ public class PhoenixToHivePartitionTable {
         String defaultDatabase = "default";
         String username = config.get("cube.phoenix.username");
         String password = config.get("cube.phoenix.password");
-//        String baseUrl =  config.get("cube.phoenix.jdbcUrl");
-        String baseUrl = "jdbc:phoenix:cdh2.360kad.com,cdh4.360kad.com,cdh5.360kad.com:2181;autoCommit=true";
+        String baseUrl =  config.get("cube.phoenix.jdbcUrl");
+//        String baseUrl = "jdbc:phoenix:cdh2.360kad.com,cdh4.360kad.com,cdh5.360kad.com:2181;autoCommit=true";
 
         JdbcCatalog phoenixCatalog = new JdbcCatalog(catalog, defaultDatabase, username, password, baseUrl);
         tableEnv.registerCatalog("phoenix", phoenixCatalog);

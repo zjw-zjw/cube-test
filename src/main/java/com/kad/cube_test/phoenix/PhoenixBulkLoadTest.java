@@ -4,6 +4,7 @@ import com.ctrip.framework.apollo.ConfigFile;
 import com.ctrip.framework.apollo.ConfigService;
 import com.ctrip.framework.apollo.core.enums.ConfigFileFormat;
 import com.kad.cube_test.kudu.OfflineBatchToKudu;
+import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.jdbc.catalog.JdbcCatalog;
@@ -13,6 +14,9 @@ import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
+import org.apache.flink.table.descriptors.Csv;
+import org.apache.flink.table.descriptors.FileSystem;
+import org.apache.flink.table.descriptors.Schema;
 import org.apache.flink.table.types.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,44 +31,34 @@ import java.util.ArrayList;
 public class PhoenixBulkLoadTest {
     private static ParameterTool config;
     private static Logger LOG = LoggerFactory.getLogger(PhoenixBulkLoadTest.class);
-    public static void main(String[] args) throws IOException, TableNotExistException {
+    public static void main(String[] args) throws Exception {
         // 创建处理环境
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(new Configuration());
-//        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+//        StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(new Configuration());
+        ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
 
         // 创建表执行环境
         EnvironmentSettings settings = EnvironmentSettings.newInstance().useBlinkPlanner().inBatchMode().build();
         TableEnvironment tableEnv = TableEnvironment.create(settings);
-        Configuration configuration = tableEnv.getConfig().getConfiguration();
-        configuration.setBoolean("table.dynamic-table-options.enabled", true);
 
         loadConfig(env);                // 加载全局配置
         initHiveCatalog(tableEnv);      // 初始化 Hive Catalog
         initPhoenixCatalog(tableEnv);   // 初始化 Phoenix Catalog
+        initSinkFileSystem(tableEnv);
+        initPrintTable(tableEnv);
 
-        // 打印测试
-        tableEnv.useCatalog("phoenix");
-        String printSql = "CREATE TABLE `default_catalog`.`default_database`.`print_table` WITH (\n" +
-                " 'connector' = 'print'\n" +
-                ") LIKE `ods_om_om_order_test` ( EXCLUDING OPTIONS )";
-        tableEnv.executeSql(printSql);
-        tableEnv.useCatalog("default_catalog");
 
-        // sink 到 hdfs
-        tableEnv.useCatalog("phoenix");
-        String sinkHdfs = "CREATE TABLE `default_catalog`.`default_database`.`fs_table` "+
-                "   WITH (\n" +
-                "  'connector'  =   'filesystem',\n" +
-                "  'path'       =   'file:///D:/tmp/phoenix/ods_om_om_order_test/',\n" +
-//                "  'path'       =   'hdfs://cdh1.360kad.com:65522/tmp/phoenix/ods_om_om_order_test',\n" +
-                "  'format'     =   'csv',\n" +
-                "  'sink.rolling-policy.file-size' = '128MB', \n" +
-                "  'sink.rolling-policy.rollover-interval' = '10 min', \n" +
-                "  'sink.rolling-policy.check-interval' = '1 min' \n" +
-                ") LIKE `ods_om_om_order_test` ( EXCLUDING OPTIONS ) ";
-        tableEnv.executeSql(sinkHdfs);
-        tableEnv.useCatalog("default_catalog");
+        CatalogBaseTable cataLogTable = tableEnv.getCatalog("phoenix").get().getTable(new ObjectPath("test", "ods_om_om_order_test"));
+        TableSchema schema = cataLogTable.getSchema();
+        Schema schemaCsv = new Schema().schema(schema);
+
+        tableEnv.connect( new FileSystem()
+//                    .path("D:\\phoenix\\ods_om_om_order_test\\data.csv")
+                        .path("hdfs://cdh1.360kad.com:65522/tmp/phoenix/ods_om_om_order_test4/data.csv")
+                )
+                .withFormat(new Csv())
+                .withSchema(schemaCsv)
+                .createTemporaryTable("outPutTable");
 
 
         /**
@@ -77,17 +71,28 @@ public class PhoenixBulkLoadTest {
 
         String sql = "SELECT *, LOCALTIMESTAMP as data_modified_datetime, 'I' as data_op_type, cast(createdate as TIMESTAMP) as data_op_ts "
                 + " FROM "
-                + " `myhive`.`test_hive`.`ods_om_om_order_test` "
-                + " WHERE SUBSTR(createdate, 1, 10) <= '2020-10-16' and SUBSTR(createdate, 1, 10) >= '2020-04-01' ";
+                + " `hive`.`myhive`.`ods_om_om_order` "
+                + " WHERE p_day between '2020-11-01' and '2020-11-31'";
+        sql = "SELECT "
+                + castFields
+                + " FROM "
+                + " (" + sql +")";
         Table table = tableEnv.sqlQuery(sql);
         tableEnv.createTemporaryView("hive_order", table);
+
+        table.insertInto("outPutTable");
+        tableEnv.execute("output table test");
 
 
         String insertPrintSql = "INSERT INTO print_table SELECT "
                 + castFields
                 + " FROM "
                 + " hive_order";
-        String insertFileSql = "INSERT INTO fs_table SELECT "
+        String insertFileSql = "INSERT OVERWRITE fs_table SELECT "
+                + castFields
+                + " FROM "
+                + " hive_order";
+        String insertOutputSql = "INSERT INTO outPutTable SELECT "
                 + castFields
                 + " FROM "
                 + " hive_order";
@@ -96,10 +101,39 @@ public class PhoenixBulkLoadTest {
                 + " FROM "
                 + " hive_order";
         StatementSet statementSet = tableEnv.createStatementSet();
+        env.setParallelism(1);
 //        statementSet.addInsertSql(insertFileSql);
-        statementSet.addInsertSql(insertPrintSql);
+//        statementSet.addInsertSql(insertOutputSql);
+//        statementSet.addInsertSql(insertPrintSql);
 //        statementSet.addInsertSql(insertPhoenixSql);
-        statementSet.execute();
+//        statementSet.execute();
+    }
+
+    private static void initPrintTable(TableEnvironment tableEnv) {
+        // 打印测试
+        tableEnv.useCatalog("phoenix");
+        String printSql = "CREATE TABLE `default_catalog`.`default_database`.`print_table` WITH (\n" +
+                " 'connector' = 'print'\n" +
+                ") LIKE `ods_om_om_order_test` ( EXCLUDING OPTIONS )";
+        tableEnv.executeSql(printSql);
+        tableEnv.useCatalog("default_catalog");
+    }
+
+    private static void initSinkFileSystem(TableEnvironment tableEnv) {
+        // sink 到 hdfs
+        tableEnv.useCatalog("phoenix");
+        String sinkHdfs = "CREATE TABLE `default_catalog`.`default_database`.`fs_table` "+
+                "   WITH (\n" +
+                "  'connector'  =   'filesystem',\n" +
+                "  'path'       =   'file:///D:/phoenix/ods_om_om_order_test/test.csv',\n" +
+//                "  'path'       =   'hdfs://cdh1.360kad.com:65522/tmp/phoenix/ods_om_om_order_test',\n" +
+                "  'format'     =   'csv',\n" +
+                "  'sink.rolling-policy.file-size' = '128MB', \n" +
+                "  'sink.rolling-policy.rollover-interval' = '10 min', \n" +
+                "  'sink.rolling-policy.check-interval' = '1 min' \n" +
+                ") LIKE `ods_om_om_order_test` ( EXCLUDING OPTIONS ) ";
+        tableEnv.executeSql(sinkHdfs);
+        tableEnv.useCatalog("default_catalog");
     }
 
     private static String[] convertCastFields(TableEnvironment tableEnv, String catalog, String database, String tableName) throws TableNotExistException {
@@ -128,7 +162,7 @@ public class PhoenixBulkLoadTest {
         return castFieldList.toArray(new String[castFieldList.size()]);
     }
 
-    private static void loadConfig(StreamExecutionEnvironment streamEnv) throws IOException {
+    private static void loadConfig(ExecutionEnvironment streamEnv) throws IOException {
         // 获取配置，注册到全局
         ConfigFile configFile = ConfigService.getConfigFile("cube", ConfigFileFormat.Properties);
         config = ParameterTool.fromPropertiesFile(new ByteArrayInputStream(configFile.getContent().getBytes()));
@@ -148,11 +182,11 @@ public class PhoenixBulkLoadTest {
     }
 
     private static void initHiveCatalog(TableEnvironment tableEnv) {
-        String name = "myhive";
-        String defaultDatabase = "test_hive";
+        String name = "hive";
+        String defaultDatabase = "myhive";
         String hiveConfDir = "src/main/resources"; // a local path
         String version = "2.1.1";
         HiveCatalog hiveCatalog = new HiveCatalog(name, defaultDatabase, hiveConfDir, version);
-        tableEnv.registerCatalog("myhive", hiveCatalog);
+        tableEnv.registerCatalog("hive", hiveCatalog);
     }
 }

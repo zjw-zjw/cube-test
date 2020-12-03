@@ -58,7 +58,7 @@ public class OfflineBatchToKudu {
                 " date_format(ordertime, 'yyyy-MM-dd') as p_day " +
                 " from " +
                 " `hive`.`myhive`.ods_om_om_orderdetail " +
-                "  where p_day < '2020-07-12' and p_day >= '2020-05-12'";
+                "  where p_day between '2020-04-01' and '2020-04-10'";
         // 订单表
         String orderSourceSql = "select " +
                 " `ordercode`,"      +        // 订单ID
@@ -72,7 +72,7 @@ public class OfflineBatchToKudu {
                 " date_format(createdate, 'yyyy-MM-dd') as p_day " +
                 "  from " +
                 " `hive`.`myhive`.ods_om_om_order " +
-                "  where p_day < '2020-07-12' and p_day >= '2020-05-12' and `changetype` not in (1, 2, 3)"; // -- 过滤掉换货订单：1-普通换货单 2-重发订单 3-先发后退换货单
+                "  where p_day between '2020-04-01' and '2020-04-10' and `changetype` not in (1, 2, 3)"; // -- 过滤掉换货订单：1-普通换货单 2-重发订单 3-先发后退换货单
         // 订单地址表
         String orderAddressSql = "select " +
                 " `ordercode`,"     +        // 订单ID
@@ -82,7 +82,7 @@ public class OfflineBatchToKudu {
                 " date_format(ordertime, 'yyyy-MM-dd') as p_day " +
                 " from " +
                 " `hive`.`myhive`.ods_om_om_orderaddress " +
-                "  where p_day < '2020-07-12' and p_day >= '2020-05-12'";
+                "  where p_day between '2020-04-01' and '2020-04-10'";
 
         String createFactSql =
                 " SELECT " +

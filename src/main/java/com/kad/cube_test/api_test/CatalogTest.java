@@ -2,7 +2,10 @@ package com.kad.cube_test.api_test;
 
 import com.kad.cube_test.model.PlayerData;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
@@ -35,6 +38,14 @@ public class CatalogTest {
 //        String
 //        tableEnv.executeSql();
 
+        RowTypeInfo rankingRowTypeInfoInteger = new RowTypeInfo(
+                new TypeInformation<?>[] {Types.STRING, Types.INT},
+                new String[] {"key", "value"});
+        RowTypeInfo rankingRowTypeInfoDecimal = new RowTypeInfo(
+                new TypeInformation<?>[] {Types.STRING, Types.BIG_DEC},
+                new String[] {"key", "value"});
 
+        TypeInformation<Row[]> typeInformation = Types.OBJECT_ARRAY(rankingRowTypeInfoInteger);
+        System.out.println(typeInformation.toString());
     }
 }

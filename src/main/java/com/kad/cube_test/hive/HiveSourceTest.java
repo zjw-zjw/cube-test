@@ -25,18 +25,18 @@ public class HiveSourceTest {
 
     public static void main(String[] args) throws Exception {
         // 创建流处理环境
-        StreamExecutionEnvironment streamEnv = StreamExecutionEnvironment.getExecutionEnvironment();
-        streamEnv.setParallelism(1);
+        ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
 
         // 创建表执行环境
-        EnvironmentSettings settings = EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build();
+        EnvironmentSettings settings = EnvironmentSettings.newInstance().useBlinkPlanner().inBatchMode().build();
         TableEnvironment tableEnv = TableEnvironment.create(settings);
 
-        loadConfig(streamEnv);                // 加载全局配置
+        loadConfig(env);                // 加载全局配置
         initHiveCatalog(tableEnv);
         initPhoenixCatalog(tableEnv);       // 初始化 Phoenix Catalog
         initSinkPrint(tableEnv);
-//        initSinkLocalFileSystem(tableEnv);
+        initSinkLocalFileSystem(tableEnv);
 
         tableEnv.getConfig().setSqlDialect(SqlDialect.HIVE);
 
@@ -47,19 +47,19 @@ public class HiveSourceTest {
 //        streamEnv.execute("hive print job");
 
         StatementSet statementSet = tableEnv.createStatementSet();
-        statementSet.addInsertSql("insert into hive_print_sink select ordercode, cuscode, p_day from `hive`.`myhive`.ods_om_om_order where p_day >= '2019-02-01' and p_day <= '2019-11-01'");
-//        statementSet.addInsertSql("insert into fs_table select * from `myhive`.`test`.stu");
+        statementSet.addInsertSql("insert into hive_print_sink select ordercode, cuscode, p_day from `hive`.`myhive`.ods_om_om_order where p_day >= '2019-10-01' and p_day <= '2019-11-01'");
+        statementSet.addInsertSql("insert into fs_table select ordercode, cuscode, p_day from `hive`.`myhive`.ods_om_om_order where p_day >= '2019-10-01' and p_day <= '2019-11-01'");
         statementSet.execute();
     }
 
     private static void initSinkLocalFileSystem(TableEnvironment tableEnv) {
         String sinkDDL = "CREATE TABLE fs_table (\n" +
-                "                id INT,\n" +
-                "                name STRING,\n" +
-                "                age INT\n" +
+                "       ordercode STRING,\n" +
+                "       cuscode STRING,\n" +
+                "       p_day STRING\n" +
                 "        ) WITH (\n" +
                 "                'connector' = 'filesystem',\n" +
-                "                'path' = 'file:///d:/abc/',\n" +
+                "                'path' = 'file:///d:/ods_om_om_order/',\n" +
                 "                'format' = 'csv'\n" +
                 "        )";
         tableEnv.executeSql(sinkDDL);
@@ -98,7 +98,7 @@ public class HiveSourceTest {
         tableEnv.registerCatalog("phoenix", phoenixCatalog);
     }
 
-    private static void loadConfig(StreamExecutionEnvironment streamEnv) throws IOException {
+    private static void loadConfig(ExecutionEnvironment streamEnv) throws IOException {
         // 获取配置，注册到全局
         ConfigFile configFile = ConfigService.getConfigFile("cube", ConfigFileFormat.Properties);
         config = ParameterTool.fromPropertiesFile(new ByteArrayInputStream(configFile.getContent().getBytes()));
