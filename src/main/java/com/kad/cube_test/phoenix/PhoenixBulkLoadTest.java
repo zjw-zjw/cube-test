@@ -60,28 +60,28 @@ public class PhoenixBulkLoadTest {
                 .withSchema(schemaCsv)
                 .createTemporaryTable("outPutTable");
 
-
         /**
          *  2020-10-16 之前
          *  读取 Hive表数据，转换为Phoenix字段类型并 以 csv格式 写入到 hdfs
          */
-        String[] castFieldsArray = convertCastFields(tableEnv, "phoenix", "test", "ods_om_om_order_test");
+        String[] castFieldsArray = convertCastFields(tableEnv, "phoenix", "cube_phx", "ods_om_om_orderdetail");
         String castFields = String.join(",", castFieldsArray);
         System.out.println(castFields);
 
-        String sql = "SELECT *, LOCALTIMESTAMP as data_modified_datetime, 'I' as data_op_type, cast(createdate as TIMESTAMP) as data_op_ts "
+        // 这里写入文件的时候  时间字段手动减去 8小时， 是因为Phoenix Bulk load的话，对TIMESTAMP字段类型会自动加8小时
+        String sql = "SELECT *, TIMESTAMPADD(HOUR, -8, LOCALTIMESTAMP) as data_modified_datetime, cast(null as TINYINT) as is_delete, 'I' as data_op_type, TIMESTAMPADD(HOUR, -8, cast(ordertime as TIMESTAMP)) as data_op_ts "
                 + " FROM "
-                + " `hive`.`myhive`.`ods_om_om_order` "
-                + " WHERE p_day between '2020-11-01' and '2020-11-31'";
-        sql = "SELECT "
-                + castFields
-                + " FROM "
-                + " (" + sql +")";
+                + " `hive`.`myhive`.`ods_om_om_orderdetail` "
+                + " WHERE p_day between '2020-11-28' and '2020-11-29'";
+//        sql = "SELECT "
+//                + castFields
+//                + " FROM "
+//                + " (" + sql +")";
         Table table = tableEnv.sqlQuery(sql);
         tableEnv.createTemporaryView("hive_order", table);
 
-        table.insertInto("outPutTable");
-        tableEnv.execute("output table test");
+//        table.insertInto("outPutTable");
+//        tableEnv.execute("output table test");
 
 
         String insertPrintSql = "INSERT INTO print_table SELECT "
@@ -102,11 +102,11 @@ public class PhoenixBulkLoadTest {
                 + " hive_order";
         StatementSet statementSet = tableEnv.createStatementSet();
         env.setParallelism(1);
-//        statementSet.addInsertSql(insertFileSql);
+        statementSet.addInsertSql(insertFileSql);
 //        statementSet.addInsertSql(insertOutputSql);
 //        statementSet.addInsertSql(insertPrintSql);
 //        statementSet.addInsertSql(insertPhoenixSql);
-//        statementSet.execute();
+        statementSet.execute();
     }
 
     private static void initPrintTable(TableEnvironment tableEnv) {
@@ -122,16 +122,18 @@ public class PhoenixBulkLoadTest {
     private static void initSinkFileSystem(TableEnvironment tableEnv) {
         // sink 到 hdfs
         tableEnv.useCatalog("phoenix");
+        tableEnv.useDatabase("cube_phx");
         String sinkHdfs = "CREATE TABLE `default_catalog`.`default_database`.`fs_table` "+
                 "   WITH (\n" +
                 "  'connector'  =   'filesystem',\n" +
-                "  'path'       =   'file:///D:/phoenix/ods_om_om_order_test/test.csv',\n" +
-//                "  'path'       =   'hdfs://cdh1.360kad.com:65522/tmp/phoenix/ods_om_om_order_test',\n" +
+                "  'path'       =   'file:///D:/phoenix/ods_om_om_order_test5/test.csv',\n" +
+//                "  'path'       =   'hdfs://cdh1.360kad.com:65522/tmp/phoenix/ods_om_om_order_test5/data.csv',\n" +
+//                "  'path'       =   'hdfs://node01:8020/phoenix_data/ods_om_om_orderdetial/data.csv',\n" +
                 "  'format'     =   'csv',\n" +
                 "  'sink.rolling-policy.file-size' = '128MB', \n" +
                 "  'sink.rolling-policy.rollover-interval' = '10 min', \n" +
                 "  'sink.rolling-policy.check-interval' = '1 min' \n" +
-                ") LIKE `ods_om_om_order_test` ( EXCLUDING OPTIONS ) ";
+                ") LIKE `ods_om_om_orderdetail` ( EXCLUDING OPTIONS ) ";
         tableEnv.executeSql(sinkHdfs);
         tableEnv.useCatalog("default_catalog");
     }

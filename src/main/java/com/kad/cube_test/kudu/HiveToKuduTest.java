@@ -23,6 +23,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 
+/**
+ *  离线初始化： 读取 Hive DWD 表数据 同步至 Kudu DWD表
+ */
 public class HiveToKuduTest {
     private static ParameterTool config;
     private static final Logger LOG = LoggerFactory.getLogger(HiveToKuduTest.class);
@@ -37,41 +40,36 @@ public class HiveToKuduTest {
         initHiveCatalog(tableEnv);
         initKuduCatalog(tableEnv);
 
-        tableEnv.getConfig().setSqlDialect(SqlDialect.HIVE);
-        String createTempViewSql = "select \n" +
-                "    date_format(ordertime, 'yyyy-MM-dd') as submit_date,\n" +
-                "    detailid as id,\n" +
-                "    warecode as ware_id,\n" +
-                "    ordercode as order_id,\n" +
-                "    ordertime as order_datetime,\n" +
-                "    ordertime as submit_datetime\n" +
-                "from\n" +
-                "    `hive`.`test_hive`.`ods_om_om_orderdetail_base`\n" +
-                " limit 100";
-        Table table = tableEnv.sqlQuery(createTempViewSql);
-        tableEnv.createTemporaryView("ods_om_om_orderdetail", table);
+        String kuduDatabase = "impala_kudu";
+        String kuduTable = "dwd_order_retail_order_pay_test";
+        String hiveDatabase = "myhive";
+        String hiveTable = "dwd_order_retail_order_pay_test";
+        String kuduCatalog = "kudu";
+        String hiveCatalog = "hive";
+        String partitionTime1 = "2020-01-01";
+        String partitionTime2 = "2020-10-30";
 
-        String[] convertCastFieldsArray = convertCastFields(tableEnv, "kudu", "default_database", "impala::impala_kudu.dwd_order_retail_order_submit_test");
+        String[] convertCastFieldsArray = convertCastFields(tableEnv, kuduCatalog, kuduDatabase, kuduTable);
         String convertCastFields = String.join(",", convertCastFieldsArray);
 
-        String insertKuduSql = "UPSERT INTO `kudu`.`default_database`.`impala::impala_kudu.dwd_order_retail_order_submit_test` SELECT "
+        String insertKuduSql_format = "UPSERT INTO %s.`default_database`.`impala::%s.%s` SELECT "
                 + convertCastFields
                 + " FROM "
-                + " ods_om_om_orderdetail";
+                + " %s.%s.%s "
+                + " WHERE p_day between '%s' and '%s'";
+        String insertKuduSql = String.format(insertKuduSql_format,
+                kuduCatalog, kuduDatabase, kuduTable,
+                hiveCatalog, hiveDatabase, hiveTable,
+                partitionTime1, partitionTime2
+        );
         StatementSet statementSet = tableEnv.createStatementSet();
         statementSet.addInsertSql(insertKuduSql);
         statementSet.execute();
-
-//        tableEnv.toAppendStream(tableEnv.sqlQuery("SELECT "
-//                + convertCastFields
-//                + " FROM "
-//                + " ods_om_om_orderdetail"), Row.class).print();
-//        streamEnv.execute();
     }
 
     private static String[] convertCastFields(TableEnvironment tableEnv, String catalog, String database, String tableName) throws TableNotExistException {
-        CatalogBaseTable hiveTable = tableEnv.getCatalog(catalog).get().getTable(new ObjectPath(database, tableName));
-        TableSchema schema = hiveTable.getSchema();
+        CatalogBaseTable table = tableEnv.getCatalog(catalog).get().getTable(new ObjectPath("default_database", "impala::"+database+"."+tableName));
+        TableSchema schema = table.getSchema();
         String[] fieldNames = schema.getFieldNames();
         DataType[] fieldDataTypes = schema.getFieldDataTypes();
 
@@ -100,7 +98,7 @@ public class HiveToKuduTest {
 
     private static void initHiveCatalog(TableEnvironment tableEnv) {
         String name = "hive";
-        String defaultDatabase = "test_hive";
+        String defaultDatabase = "myhive";
         String hiveConfDir = "src/main/resources"; // a local path
         String version = "2.1.1";
         HiveCatalog hiveCatalog = new HiveCatalog(name, defaultDatabase, hiveConfDir, version);

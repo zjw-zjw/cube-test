@@ -27,8 +27,8 @@ public class OfflineBatchToKudu {
     private static Logger LOG = LoggerFactory.getLogger(OfflineBatchToKudu.class);
     public static void main(String[] args) throws Exception {
         // 创建处理环境
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(new Configuration());
-//        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+//        StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(new Configuration());
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
 
         // 创建表执行环境
@@ -46,7 +46,7 @@ public class OfflineBatchToKudu {
         /**
          *  选取的订单详情表数据，与 订单表、商品表、订单地址表等 join 形成 FACT表
          */
-        tableEnv.getConfig().setSqlDialect(SqlDialect.HIVE);
+//        tableEnv.getConfig().setSqlDialect(SqlDialect.HIVE);
         // 订单详情表
         String orderDetailSourceSql = "select " +
                 " detailid, " +
@@ -55,10 +55,10 @@ public class OfflineBatchToKudu {
                 " ordertime," +
                 " qty, " +
                 " sumnetamt, " +
-                " date_format(ordertime, 'yyyy-MM-dd') as p_day " +
+                " p_day " +
                 " from " +
                 " `hive`.`myhive`.ods_om_om_orderdetail " +
-                "  where p_day between '2020-04-01' and '2020-04-10'";
+                "  where p_day between '2020-03-10' and '2020-03-20'";
         // 订单表
         String orderSourceSql = "select " +
                 " `ordercode`,"      +        // 订单ID
@@ -69,20 +69,20 @@ public class OfflineBatchToKudu {
                 " `salemode`,"       +        // 销售模式
                 " `invoicetype`,"    +        // 登记发票类型
                 " `createdate`, "     +        // 下单时间
-                " date_format(createdate, 'yyyy-MM-dd') as p_day " +
+                "  p_day " +
                 "  from " +
                 " `hive`.`myhive`.ods_om_om_order " +
-                "  where p_day between '2020-04-01' and '2020-04-10' and `changetype` not in (1, 2, 3)"; // -- 过滤掉换货订单：1-普通换货单 2-重发订单 3-先发后退换货单
+                "  where p_day between '2020-03-10' and '2020-03-20' and `changetype` not in (1, 2, 3)"; // -- 过滤掉换货订单：1-普通换货单 2-重发订单 3-先发后退换货单
         // 订单地址表
         String orderAddressSql = "select " +
                 " `ordercode`,"     +        // 订单ID
                 " `provincecode`,"  +        // 省编号
                 " `citycode`,"      +        // 市编号
                 " `areacode`, "      +        // 地址编号，最后一级地址的编号
-                " date_format(ordertime, 'yyyy-MM-dd') as p_day " +
+                " p_day " +
                 " from " +
                 " `hive`.`myhive`.ods_om_om_orderaddress " +
-                "  where p_day between '2020-04-01' and '2020-04-10'";
+                "  where p_day between '2020-03-10' and '2020-03-20'";
 
         String createFactSql =
                 " SELECT " +
@@ -180,7 +180,7 @@ public class OfflineBatchToKudu {
 
     private static void initOrderDimDateTimeFunction(TableEnvironment tableEnv) {
         tableEnv.createTemporarySystemFunction("ORDER_DIM_DATE_TIME", new DimDateTimeFunction("submit"));     // 下单日期维度
-        tableEnv.createTemporarySystemFunction("PAY_DIM_DATE_TIME", new DimDateTimeFunction("pay"));        // 支付日期维度
+        tableEnv.createTemporarySystemFunction("PAY_DIM_DATE_TIME", new DimDateTimeFunction("pay"));          // 支付日期维度
     }
 
     private static void readMysqlTable(TableEnvironment tableEnv) throws TableNotExistException {

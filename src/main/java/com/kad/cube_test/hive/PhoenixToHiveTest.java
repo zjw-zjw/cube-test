@@ -35,18 +35,19 @@ public class PhoenixToHiveTest {
         initHiveCatalog(tableEnv);      // 初始化 Hive Catalog
         initPhoenixCatalog(tableEnv);   // 初始化 Phoenix Catalog
 
-        String hiveTable = "ods_om_om_order_test2";
-        String hiveDatabase = "test_hive";
-        String catalog = "hive";
-
-        String[] castFieldsArray= convertCastFieldsToHive(tableEnv, catalog, hiveDatabase, hiveTable);
-        String castFieldsStr = String.join(",", castFieldsArray);
+//        String hiveTable = "ods_om_om_order_test2";
+//        String hiveDatabase = "test_hive";
+//        String catalog = "hive";
+//
+//        String[] castFieldsArray= convertCastFieldsToHive(tableEnv, catalog, hiveDatabase, hiveTable);
+//        String castFieldsStr = String.join(",", castFieldsArray);
         tableEnv.getConfig().setSqlDialect(SqlDialect.HIVE);
 
         StatementSet statementSet = tableEnv.createStatementSet();
-        String insertHiveSql = "INSERT OVERWRITE `hive`.`test_hive`.`ods_om_om_order_test2` select "
-                + castFieldsStr
-                + " FROM `phoenix`.`cube_phx`.`ods_om_om_order`";
+        String insertHiveSql = "INSERT OVERWRITE `hive`.`myhive`.`timestamp_test` PARTITION(p_day='2020-11-03') select "
+                + " ordercode, cast(createdate as STRING) as ordertime_str, cast(createdate as TIMESTAMP) as ordertime_ts "
+                + " FROM `phoenix`.`cube_phx`.`ods_om_om_order` "
+                + " WHERE date_format(createdate, 'yyyy-MM-dd') ='2020-11-03'";
         statementSet.addInsertSql(insertHiveSql);
         statementSet.execute();
     }
@@ -131,7 +132,7 @@ public class PhoenixToHiveTest {
 
     private static void initHiveCatalog(TableEnvironment tableEnv) {
         String name = "hive";
-        String defaultDatabase = "test_hive";
+        String defaultDatabase = "default";
         String hiveConfDir = "src/main/resources"; // a local path
         String version = "2.1.1";
         HiveCatalog hiveCatalog = new HiveCatalog(name, defaultDatabase, hiveConfDir, version);
